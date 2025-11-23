@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AthleteController;
+use App\Http\Controllers\AthleteController; // ✅ Contrôleur WEB
 
 Route::get('/', function () {
     return redirect()->route('athletes.index');
@@ -24,4 +24,6 @@ Route::prefix('associations')->group(function () {
 
 Route::prefix('parametres')->group(function () {
     Route::get('/', fn() => view('parametres.index'))->name('parametres.index');
+    
 });
+Route::get('athletes-search', [App\Http\Controllers\AthleteController::class, 'search'])->name('athletes.search');

@@ -8,12 +8,88 @@ use Illuminate\Support\Facades\Storage;
 
 class AthleteController extends Controller
 {
-    public function index()
+    // Affiche la page principale (charge les premiers résultats)
+    public function index(Request $request)
     {
-        $athletes = Athlete::latest()->paginate(15);
-        return view('athletes.index', compact('athletes'));
+        // On conserve la même logique de recherche/pagination que pour l'endpoint AJAX :
+        $athletes = $this->buildQuery($request)->latest()->paginate(10)->appends($request->query());
+
+        // Pour les filtres (listes déroulantes) : valeurs distinctes
+        $villes = Athlete::select('ville')->distinct()->pluck('ville')->filter()->values();
+        $genres = Athlete::select('genre')->distinct()->pluck('genre')->filter()->values();
+
+        return view('athletes.index', compact('athletes', 'villes', 'genres'));
     }
 
+    // Endpoint AJAX qui renvoie uniquement la partial du tableau
+    public function search(Request $request)
+    {
+        $athletes = $this->buildQuery($request)->latest()->paginate(10)->appends($request->query());
+
+        // Si la requête est AJAX, on renvoie le HTML de la partial
+        if ($request->ajax()) {
+            $html = view('athletes._table', compact('athletes'))->render();
+            return response()->json(['html' => $html]);
+        }
+
+        // Fallback (si on accède directement) : retourne la vue index complète
+        $villes = Athlete::select('ville')->distinct()->pluck('ville')->filter()->values();
+        $genres = Athlete::select('genre')->distinct()->pluck('genre')->filter()->values();
+
+        return view('athletes.index', compact('athletes', 'villes', 'genres'));
+    }
+
+    // Méthode réutilisée pour construire la query selon les filtres
+    protected function buildQuery(Request $request)
+    {
+        $query = Athlete::query();
+
+        // Recherche texte globale (search)
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('nom', 'like', "%{$search}%")
+                  ->orWhere('prenom', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('telephone', 'like', "%{$search}%")
+                  ->orWhere('ville', 'like', "%{$search}%")
+                  ->orWhere('numero_certificat_handicap', 'like', "%{$search}%");
+            });
+        }
+
+        // Filtres spécifiques
+        if ($request->filled('nom')) {
+            $query->where('nom', 'like', '%' . $request->input('nom') . '%');
+        }
+
+        if ($request->filled('prenom')) {
+            $query->where('prenom', 'like', '%' . $request->input('prenom') . '%');
+        }
+
+        if ($request->filled('genre')) {
+            $query->where('genre', $request->input('genre'));
+        }
+
+        if ($request->filled('ville')) {
+            $query->where('ville', $request->input('ville'));
+        }
+
+        if ($request->filled('activites_collectives')) {
+            $query->where('activites_collectives', 'like', '%' . $request->input('activites_collectives') . '%');
+        }
+
+        if ($request->filled('activites_individuelles')) {
+            $query->where('activites_individuelles', 'like', '%' . $request->input('activites_individuelles') . '%');
+        }
+
+        if ($request->filled('autres_activites')) {
+            $query->where('autres_activites', 'like', '%' . $request->input('autres_activites') . '%');
+        }
+
+        return $query;
+    }
+
+    // --- Les autres méthodes CRUD restent inchangées (store, create, show, edit, update, destroy)
     public function create()
     {
         return view('athletes.create');
